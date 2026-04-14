@@ -689,7 +689,7 @@
         playSound(project.soundTone || 'double');
         stopTimer();
       }
-    }, 1000);
+    }, 100);
     saveProjects();
     render();
   }

@@ -897,7 +897,7 @@
         playSound(project.soundTone || 'double');
         stopTimer();
       }
-    }, 1000);
+    }, 100);
     saveProjects();
     render();
   }
@@ -906,6 +906,8 @@
     if (state.timerHandle) clearInterval(state.timerHandle);
     state.timerHandle = null;
     state.timerTargetTs = null;
+    updateCountdown();
+  }
     updateCountdown();
   }
 
