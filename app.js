@@ -9,6 +9,8 @@
     deferredPrompt: null,
     editingSceneId: null,
     confirmAction: null,
+    timerMinimized: false,
+    wakeLock: null,
   };
 
   const el = id => document.getElementById(id);
@@ -58,6 +60,20 @@
   }
   function requestNotifications() {
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  }
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator && !state.wakeLock) {
+      try {
+        state.wakeLock = await navigator.wakeLock.request('screen');
+        state.wakeLock.addEventListener('release', () => { state.wakeLock = null; });
+      } catch (e) { console.log('Wake lock not available'); }
+    }
+  }
+  async function releaseWakeLock() {
+    if (state.wakeLock) {
+      await state.wakeLock.release();
+      state.wakeLock = null;
+    }
   }
   function playSound(kind = 'beep') {
     const project = getActiveProject();
@@ -275,7 +291,15 @@
                 </div>
                 <div id="countdownBox" class="pill ${scene ? 'ok' : 'warnc'}">${state.timerTargetTs ? 'Timer running' : 'Timer idle'}</div>
               </div>
-              <div id="countdownText" style="margin-top:8px; font-size:1.2rem; font-weight:800;">${formatRemaining()}</div>
+              ${state.timerMinimized ? `
+                <div class="row" style="justify-content:space-between; align-items:center; margin-top:8px; cursor:pointer;" onclick="document.body.dispatchEvent(new CustomEvent('toggleTimerMinimize'))">
+                  <span style="font-size:1.5rem; font-weight:800;">${formatRemaining()}</span>
+                  <span class="muted">Tap to expand</span>
+                </div>
+              ` : `
+                <div id="countdownText" style="margin-top:8px; font-size:1.2rem; font-weight:800;">${formatRemaining()}</div>
+                <button class="btn" style="margin-top:6px; padding:4px 8px; font-size:0.8rem;" id="minimizeTimerBtn">Minimize</button>
+              `}
             </div>
             <div class="stack">
               ${day.scenes.length ? day.scenes.map(s => renderSceneCard(project, day, s)).join('') : '<div class="muted">No scenes for this day yet.</div>'}
@@ -378,6 +402,8 @@
     el('addSceneBtn').onclick = () => openSceneDialog();
     el('startDayBtn').onclick = () => startDayTimer();
     el('stopDayBtn').onclick = () => stopDay();
+    el('minimizeTimerBtn').onclick = () => { state.timerMinimized = true; render(); };
+    document.body.addEventListener('toggleTimerMinimize', () => { state.timerMinimized = false; render(); });
     el('saveProjectDetailsBtn').onclick = () => saveProjectDetails();
     el('saveBudgetBtn').onclick = () => saveBudgetTotals();
     el('addExpenseBtn').onclick = () => addExpense();
@@ -681,6 +707,7 @@
     if (!scene) { render(); return; }
     state.timerTargetTs = Date.now() + (Number(scene.plannedMinutes || 0) * 60 * 1000);
     stopTimer();
+    requestWakeLock();
     state.timerHandle = setInterval(() => {
       updateCountdown();
       if (Date.now() >= state.timerTargetTs) {
@@ -698,6 +725,7 @@
     if (state.timerHandle) clearInterval(state.timerHandle);
     state.timerHandle = null;
     state.timerTargetTs = null;
+    releaseWakeLock();
     updateCountdown();
   }
 
